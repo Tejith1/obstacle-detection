@@ -7,6 +7,7 @@ import numpy as np
 import os
 import pathlib
 import sys
+from collections import Counter
 
 # Fix for Windows when loading Linux-trained YOLO weights
 temp = pathlib.PosixPath
@@ -28,7 +29,7 @@ CONF_THRESH = 0.25
 IOU_THRESH = 0.45
 DEVICE = ''               # '' = auto, or 'cpu' or '0' or '0,1' etc.
 SHOW_FPS = True
-CAMERA_INDEX = 0
+CAMERA_INDEX = 1
 # Map class name -> custom sentence (edit to fit your classes)
 MSG_MAP = {
     # "person": "Person detected — be careful!",
@@ -78,6 +79,13 @@ def scale_boxes_from_letterbox_np(boxes, ratio, dwdh, original_shape):
 
     dw, dh = dwdh
     h0, w0 = original_shape
+
+    # Handle ratio - convert to scalar if needed
+    if isinstance(ratio, (list, tuple, np.ndarray)):
+        ratio = ratio[0] if len(ratio) > 0 else 1.0
+    
+    # Ensure ratio is a scalar
+    ratio = float(ratio)
 
     # scale boxes
     boxes[:, 0] = (boxes[:, 0] - dw) / ratio
@@ -139,6 +147,9 @@ def main():
             pred = non_max_suppression(pred, CONF_THRESH, IOU_THRESH, None, False, max_det=1000)
 
             # process detections
+            obstacle_count = 0
+            class_counts = Counter()
+            
             if len(pred) and pred[0] is not None and len(pred[0]):
                 det = pred[0].clone().detach().cpu().numpy()  # Nx6: x1,y1,x2,y2,conf,cls
                 boxes = det[:, :4].copy()
@@ -151,17 +162,34 @@ def main():
 
                 if len(boxes) > 0:
                     det[:, :4] = boxes
+                    obstacle_count = len(det)  # Count total obstacles
+                    
                     for *xyxy, conf, cls in det:
                         x1, y1, x2, y2 = map(int, xyxy)
                         cls = int(cls)
                         label_name = names[cls] if cls < len(names) else f"class{cls}"
+                        class_counts[label_name] += 1  # Count each class type
+                        
                         label = f"{label_name} {conf:.2f}"
                         draw_color = (0, 255, 0)
                         draw_box(img0, (x1, y1, x2, y2), label=label, color=draw_color, thickness=2)
 
-                        # custom sentence mapping
-                        sentence = MSG_MAP.get(label_name, f"Command: {label_name} detected")
-                        cv2.putText(img0, sentence, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2, cv2.LINE_AA)
+            # Display obstacle count at the top
+            if obstacle_count > 0:
+                # Main count display - Large and prominent
+                count_text = f"TOTAL OBSTACLES: {obstacle_count}"
+                cv2.putText(img0, count_text, (10, 40), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 255), 3, cv2.LINE_AA)
+                
+                # Breakdown by class - smaller text below
+                breakdown_y = 80
+                breakdown_parts = []
+                for class_name, count in class_counts.most_common():
+                    breakdown_parts.append(f"{class_name}: {count}")
+                breakdown_text = " | ".join(breakdown_parts)
+                cv2.putText(img0, breakdown_text, (10, breakdown_y), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 140, 0), 2, cv2.LINE_AA)
+            else:
+                # No obstacles detected
+                cv2.putText(img0, "NO OBSTACLES DETECTED", (10, 40), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 3, cv2.LINE_AA)
 
             # FPS
             if SHOW_FPS:
