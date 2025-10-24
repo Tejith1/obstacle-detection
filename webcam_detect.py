@@ -8,6 +8,7 @@ import os
 import pathlib
 import sys
 from collections import Counter
+from drone_navigation import DroneNavigator, get_navigation_command
 
 # Fix for Windows when loading Linux-trained YOLO weights
 temp = pathlib.PosixPath
@@ -121,6 +122,14 @@ def main():
     if not cap.isOpened():
         raise RuntimeError(f"Could not open webcam (index {CAMERA_INDEX}). Try changing the index.")
 
+    # Initialize drone navigator
+    ret, test_frame = cap.read()
+    if ret:
+        h, w = test_frame.shape[:2]
+        navigator = DroneNavigator(w, h)
+    else:
+        navigator = DroneNavigator()
+
     prev_time = 0.0
     try:
         while True:
@@ -149,6 +158,7 @@ def main():
             # process detections
             obstacle_count = 0
             class_counts = Counter()
+            current_detections = []
             
             if len(pred) and pred[0] is not None and len(pred[0]):
                 det = pred[0].clone().detach().cpu().numpy()  # Nx6: x1,y1,x2,y2,conf,cls
@@ -170,9 +180,18 @@ def main():
                         label_name = names[cls] if cls < len(names) else f"class{cls}"
                         class_counts[label_name] += 1  # Count each class type
                         
+                        # Store detection for navigation analysis
+                        current_detections.append([x1, y1, x2, y2, conf, cls])
+                        
                         label = f"{label_name} {conf:.2f}"
                         draw_color = (0, 255, 0)
                         draw_box(img0, (x1, y1, x2, y2), label=label, color=draw_color, thickness=2)
+
+            # Analyze navigation
+            nav_result = navigator.analyze_obstacles(current_detections)
+            
+            # Draw navigation overlay
+            img0 = navigator.draw_navigation_overlay(img0, nav_result, current_detections)
 
             # Display obstacle count at the top
             if obstacle_count > 0:
