@@ -78,20 +78,33 @@ def scale_boxes_from_letterbox_np(boxes, ratio, dwdh, original_shape):
 
     dw, dh = dwdh
     h0, w0 = original_shape
+    
+    # Debug prints to understand the shapes
+    print(f"Debug - boxes shape: {boxes.shape}")
+    print(f"Debug - dw: {dw}, dh: {dh}, ratio: {ratio}")
+    print(f"Debug - dw type: {type(dw)}, dh type: {type(dh)}")
+
+    # Make a copy to avoid modifying original array
+    boxes_scaled = boxes.copy()
+
+    # Ensure dw, dh are scalars
+    dw = float(dw) if hasattr(dw, '__float__') else dw[0] if hasattr(dw, '__len__') else dw
+    dh = float(dh) if hasattr(dh, '__float__') else dh[0] if hasattr(dh, '__len__') else dh
+    ratio = float(ratio) if hasattr(ratio, '__float__') else ratio[0] if hasattr(ratio, '__len__') else ratio
 
     # scale boxes
-    boxes[:, 0] = (boxes[:, 0] - dw) / ratio
-    boxes[:, 1] = (boxes[:, 1] - dh) / ratio
-    boxes[:, 2] = (boxes[:, 2] - dw) / ratio
-    boxes[:, 3] = (boxes[:, 3] - dh) / ratio
+    boxes_scaled[:, 0] = (boxes_scaled[:, 0] - dw) / ratio
+    boxes_scaled[:, 1] = (boxes_scaled[:, 1] - dh) / ratio
+    boxes_scaled[:, 2] = (boxes_scaled[:, 2] - dw) / ratio
+    boxes_scaled[:, 3] = (boxes_scaled[:, 3] - dh) / ratio
 
     # clip boxes to image size
-    boxes[:, 0] = np.clip(boxes[:, 0], 0, w0 - 1)
-    boxes[:, 1] = np.clip(boxes[:, 1], 0, h0 - 1)
-    boxes[:, 2] = np.clip(boxes[:, 2], 0, w0 - 1)
-    boxes[:, 3] = np.clip(boxes[:, 3], 0, h0 - 1)
+    boxes_scaled[:, 0] = np.clip(boxes_scaled[:, 0], 0, w0 - 1)
+    boxes_scaled[:, 1] = np.clip(boxes_scaled[:, 1], 0, h0 - 1)
+    boxes_scaled[:, 2] = np.clip(boxes_scaled[:, 2], 0, w0 - 1)
+    boxes_scaled[:, 3] = np.clip(boxes_scaled[:, 3], 0, h0 - 1)
 
-    return boxes
+    return boxes_scaled
 
 
 def main():
