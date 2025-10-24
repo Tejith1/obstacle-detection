@@ -85,4 +85,7 @@ git add .
 
 - YOLOv5 and Ultralytics: https://github.com/ultralytics/yolov5
 - This repository bundles YOLOv5 code and is intended for educational and development use.
+<<<<<<< HEAD
 
+=======
+>>>>>>> af6658929b967ee51cd02d58bcc415d1bcf03fd3
