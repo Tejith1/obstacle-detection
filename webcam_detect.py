@@ -29,7 +29,7 @@ CONF_THRESH = 0.25
 IOU_THRESH = 0.45
 DEVICE = ''               # '' = auto, or 'cpu' or '0' or '0,1' etc.
 SHOW_FPS = True
-CAMERA_INDEX = 1
+CAMERA_INDEX = 0
 # Map class name -> custom sentence (edit to fit your classes)
 MSG_MAP = {
     # "person": "Person detected — be careful!",
