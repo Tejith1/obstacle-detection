@@ -116,17 +116,17 @@ Class ID | Class Name
 
 ✅ **Real-time counting** - updates every frame  
 ✅ **Class breakdown** - see what types of obstacles  
-✅ **Color-coded** - red for obstacles, green for clear  
-✅ **Attendance-like** - counts unique detections in current frame  
+✅ **Color-coded** - green bounding boxes with labels  
+✅ **Per-frame detection** - counts unique detections in current frame  
 ✅ **Non-intrusive** - doesn't block the video view  
 
 ## 🎯 Practical Applications
 
-- **Navigation systems**: Count obstacles before proceeding
+- **Drone navigation**: Count obstacles before proceeding
 - **Safety monitoring**: Alert when too many obstacles present
 - **Traffic analysis**: Count vehicles and pedestrians
 - **Warehouse robots**: Detect and count objects in path
-- **Attendance systems**: Count people entering/exiting
+- **Autonomous vehicles**: Environmental awareness systems
 
 ## 🔍 Technical Details
 

@@ -1,91 +1,255 @@
-# Obstacle Detection (YOLOv5)
+# 🚁 Drone Obstacle Detection & Navigation System
 
-A simple obstacle detection project using YOLOv5 for real-time object detection from webcam input.
+A real-time obstacle detection and navigation system for drones using YOLOv5 deep learning model. This system processes live camera feeds to detect obstacles and provides intelligent navigation recommendations for autonomous drone flight.
 
-This repository contains a local copy of YOLOv5 (in the `yolov5/` directory), a `webcam_detect.py` script to run webcam detection, and a trained weights file `best.pt`.
+## 🌟 Features
 
-## Contents
+- **Real-time Obstacle Detection**: Uses YOLOv5 for fast and accurate obstacle detection
+- **Intelligent Navigation**: Analyzes obstacle positions and suggests optimal flight directions
+- **Web Dashboard**: Modern, responsive web interface for monitoring and control
+- **Performance Optimized**: Multiple settings for balancing speed and accuracy
+- **Zone-based Analysis**: Divides the view into zones for strategic navigation decisions
+- **Live Statistics**: Real-time FPS, detection counts, and navigation status
 
-- `webcam_detect.py` — main script to run webcam object detection
-- `best.pt` — trained YOLOv5 weights (model)
-- `yolov5/` — local copy of the Ultralytics YOLOv5 repository (integrated into this project)
+## 🏗️ System Architecture
 
-## Requirements
-
-- Windows (development tested on Windows)
-- Python 3.12 (virtual environment recommended)
-- A webcam (or use a video file by modifying the script)
-
-Recommended: use the bundled `.venv` virtual environment or create a new one.
-
-## Setup (recommended)
-
-1. Create and activate a virtual environment (PowerShell):
-
-```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
+```
+┌─────────────────┐
+│  Camera Feed    │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│  YOLOv5 Model   │ ← Detection
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│ Drone Navigator │ ← Analysis
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│  Web Interface  │ ← Visualization
+└─────────────────┘
 ```
 
-2. Upgrade pip and install required packages:
+## 📋 Prerequisites
 
-```powershell
-python -m pip install --upgrade pip
-python -m pip install -r yolov5/requirements.txt
-# or install packages used by this project manually:
-python -m pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
-python -m pip install opencv-python matplotlib numpy
+- Python 3.8 or higher
+- CUDA-capable GPU (recommended for better performance)
+- Webcam or camera device
+- Pre-trained YOLOv5 model (`best.pt`)
+
+## 🚀 Installation
+
+1. **Clone the repository**
+   ```bash
+   git clone <your-repo-url>
+   cd detection
+   ```
+
+2. **Install dependencies**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+3. **Verify model file**
+   - Ensure `best.pt` (trained YOLOv5 model) is in the project root directory
+
+## 💻 Usage
+
+### Starting the Web Interface
+
+```bash
+python web_interface.py
 ```
 
-Note: The Yolov5 `requirements.txt` may include extra packages. If you have a GPU and compatible CUDA, install the appropriate `torch` build instead of the CPU wheel above.
+Then open your browser and navigate to:
+- Local access: `http://localhost:5000`
+- Network access: `http://0.0.0.0:5000`
 
-## Run webcam detection
+### Command Line Detection
 
-From the project root (PowerShell):
+For basic webcam detection without the web interface:
 
-```powershell
-.\.venv\Scripts\Activate.ps1
+```bash
 python webcam_detect.py
 ```
 
-This will open your default webcam (index 0). To change the camera index or run on a video file, edit `webcam_detect.py`.
+### Drone Navigation Module
 
-## Common issues and troubleshooting
+The navigation system can also be used standalone:
 
-1. ModuleNotFoundError: No module named 'matplotlib.backends.registry'
-   - This indicates a corrupted matplotlib installation. Fix by reinstalling matplotlib in your virtualenv:
+```python
+from drone_navigation import DroneNavigator, get_navigation_command
 
-```powershell
-.\.venv\Scripts\Activate.ps1
-python -m pip install --force-reinstall matplotlib
+navigator = DroneNavigator(frame_width=640, frame_height=480)
+nav_result = navigator.analyze_obstacles(detections)
+command = get_navigation_command(nav_result)
 ```
 
-2. numpy/opencv version incompatibility
-   - If you get an error when installing numpy (e.g., `opencv-python requires numpy<2.3.0,>=2`), install compatible versions:
+## 🎮 Web Interface Controls
 
-```powershell
-python -m pip install numpy==2.2.6 opencv-python==4.12.0.88
-python -m pip install --force-reinstall matplotlib
+### Detection Statistics
+- **Total Obstacles**: Real-time count of detected objects
+- **FPS**: Frames per second performance indicator
+- **Class Breakdown**: Distribution of detected object types
+
+### Navigation Status
+- **CLEAR_PATH**: Safe to proceed forward
+- **CAUTION**: Obstacles present, alternative route suggested
+- **DANGER_STOP**: Critical obstacles, immediate stop required
+
+### Performance Settings
+- **Confidence Threshold** (0.1-0.9): Minimum detection confidence
+- **IoU Threshold** (0.1-0.9): Intersection over Union for NMS
+- **Frame Skip** (1-3): Process every Nth frame for better FPS
+- **JPEG Quality** (50-95): Video stream compression quality
+
+### Quick Actions
+- **Max FPS**: Optimize for maximum performance
+- **Max Quality**: Optimize for best detection accuracy
+- **Balanced**: Balanced performance and quality
+- **Reset**: Restore default settings
+
+## 📊 Navigation System
+
+The navigation system divides the camera view into 5 zones:
+
+```
+┌─────────┬─────────┬─────────┐
+│         │   TOP   │         │
+│  LEFT   ├─────────┤  RIGHT  │
+│         │ CENTER  │         │
+├─────────┼─────────┼─────────┤
+│         │ BOTTOM  │         │
+└─────────┴─────────┴─────────┘
 ```
 
-3. Embedded `yolov5` repository warning when adding to git
-   - If you see a warning about an embedded git repo when running `git add .`, remove the `yolov5/.git` folder (if you don't want it as a submodule):
+### Navigation Logic
+1. **Obstacle Detection**: Detects all objects in frame
+2. **Zone Assignment**: Maps each obstacle to one or more zones
+3. **Danger Scoring**: Calculates danger level per zone based on:
+   - Number of obstacles
+   - Size of obstacles
+   - Proximity to center
+4. **Direction Recommendation**: Suggests safest navigation direction:
+   - FORWARD (if center clear)
+   - LEFT/RIGHT (if center blocked)
+   - UP/DOWN (if sides blocked)
+   - STOP (if all paths dangerous)
 
-```powershell
-Remove-Item -Recurse -Force "yolov5\.git"
-git add .
+## 📁 Project Structure
+
+```
+detection/
+├── web_interface.py          # Flask web server and main interface
+├── drone_navigation.py       # Navigation logic and zone analysis
+├── webcam_detect.py          # Standalone webcam detection
+├── best.pt                   # YOLOv5 trained model
+├── requirements.txt          # Python dependencies
+├── templates/
+│   └── dashboard.html        # Web dashboard UI
+├── yolov5/                   # YOLOv5 framework
+└── docs/                     # Additional documentation
+    ├── API.md
+    ├── INSTALLATION.md
+    ├── PROJECT_STRUCTURE.md
+    └── USAGE.md
 ```
 
-## Notes
+## 🔧 Configuration
 
-- This project uses YOLOv5 (Ultralytics) for detection. See `yolov5/README.md` for more details about the model and training.
-- If you want to track `yolov5` separately, use `git submodule add <url> yolov5` instead of embedding the repo.
+### Model Settings
+Edit the configuration in `web_interface.py`:
 
-## License and Acknowledgements
+```python
+WEIGHTS = "best.pt"           # Model file
+IMG_SIZE = 416                # Input image size (lower = faster)
+CONF_THRESH = 0.25           # Confidence threshold
+IOU_THRESH = 0.45            # NMS IoU threshold
+```
 
-- YOLOv5 and Ultralytics: https://github.com/ultralytics/yolov5
-- This repository bundles YOLOv5 code and is intended for educational and development use.
-<<<<<<< HEAD
+### Camera Settings
+```python
+CAMERA_INDEX = 0             # Camera device index
+FRAME_WIDTH = 640            # Camera resolution width
+FRAME_HEIGHT = 480           # Camera resolution height
+```
 
-=======
->>>>>>> af6658929b967ee51cd02d58bcc415d1bcf03fd3
+## 🎯 Performance Optimization Tips
+
+1. **For Maximum FPS** (30+ FPS):
+   - Set confidence threshold to 0.35+
+   - Enable frame skipping (2-3 frames)
+   - Reduce JPEG quality to 60-70
+   - Use lower resolution (416x416)
+
+2. **For Maximum Accuracy**:
+   - Set confidence threshold to 0.20
+   - Disable frame skipping
+   - Increase JPEG quality to 90+
+   - Close other camera applications
+
+3. **Balanced Performance** (20-30 FPS):
+   - Confidence threshold: 0.25
+   - Frame skip: 1
+   - JPEG quality: 80
+   - Resolution: 640x480
+
+## 🐛 Troubleshooting
+
+### Camera Not Found
+```bash
+# List available cameras
+python -c "import cv2; print([i for i in range(5) if cv2.VideoCapture(i).isOpened()])"
+```
+
+### Low FPS
+- Close other applications using the camera
+- Reduce detection resolution
+- Enable frame skipping
+- Lower JPEG quality
+- Ensure GPU is being used (check CUDA availability)
+
+### Model Loading Error
+- Verify `best.pt` exists in the project directory
+- Check PyTorch and CUDA versions are compatible
+- Try re-downloading the model file
+
+## 📈 Future Enhancements
+
+- [ ] Multi-drone coordination
+- [ ] 3D obstacle mapping
+- [ ] Path planning algorithms
+- [ ] Autonomous flight integration
+- [ ] Cloud-based processing
+- [ ] Mobile app support
+- [ ] Recording and replay functionality
+
+## 🤝 Contributing
+
+Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- **YOLOv5** by Ultralytics for the object detection framework
+- **Flask** for the web framework
+- **OpenCV** for computer vision capabilities
+- **PyTorch** for deep learning infrastructure
+
+## 📞 Support
+
+For issues, questions, or contributions, please:
+- Open an issue on GitHub
+- Check existing documentation in the `docs/` folder
+- Review troubleshooting section above
+
+---
+
+**Built with ❤️ for autonomous drone navigation**
