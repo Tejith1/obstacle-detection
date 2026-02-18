@@ -191,12 +191,24 @@ class WebDetectionSystem:
             label = f"{class_name} {conf:.2f}"
             cv2.putText(output_frame, label, (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
         
-        # Navigation analysis (only if needed)
+        # Navigation analysis with full overlay
         nav_result = {}
         if self.settings['show_navigation']:
             nav_result = self.navigator.analyze_obstacles(detections)
-            # Simplified overlay for better performance
-            self._draw_simple_overlay(output_frame, nav_result, len(detections))
+            # Use the full navigation overlay for better visualization
+            output_frame = self.navigator.draw_navigation_overlay(output_frame, nav_result, detections)
+            
+            # Add obstacle count display (positioned to not overlap)
+            if len(detections) > 0:
+                count_text = f"OBSTACLES: {len(detections)}"
+                cv2.rectangle(output_frame, (8, 145), (250, 185), (0, 0, 0), -1)
+                cv2.rectangle(output_frame, (8, 145), (250, 185), (0, 255, 0), 2)
+                cv2.putText(output_frame, count_text, (15, 170), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+            
+            # Add FPS indicator (top-left, below obstacle count)
+            h, w = output_frame.shape[:2]
+            fps_text = f"FPS: {self.detection_stats.get('fps', 0)}"
+            cv2.putText(output_frame, fps_text, (10, 210), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
         
         # Calculate FPS
         process_time = time.time() - start_time
@@ -214,31 +226,6 @@ class WebDetectionSystem:
             }
         
         return output_frame
-    
-    def _draw_simple_overlay(self, frame, nav_result, detection_count):
-        """Draw simplified overlay for better performance"""
-        h, w = frame.shape[:2]
-        
-        # Simple info panel
-        panel_height = 80
-        overlay = frame[0:panel_height, 0:300].copy()
-        overlay = cv2.addWeighted(overlay, 0.3, np.zeros_like(overlay), 0.7, 0)
-        frame[0:panel_height, 0:300] = overlay
-        
-        # Draw text
-        y_offset = 25
-        cv2.putText(frame, f"Obstacles: {detection_count}", (10, y_offset), 
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
-        
-        if nav_result.get('status'):
-            y_offset += 25
-            status_color = (0, 255, 0) if nav_result['status'] == 'CLEAR_PATH' else (0, 0, 255)
-            cv2.putText(frame, f"Status: {nav_result['status']}", (10, y_offset), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, status_color, 1)
-            
-        # FPS indicator
-        cv2.putText(frame, f"FPS: {self.detection_stats.get('fps', 0)}", (w-120, 30),
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
 
 detection_system = WebDetectionSystem()
 

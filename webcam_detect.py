@@ -206,22 +206,35 @@ def main():
             # Draw navigation overlay
             img0 = navigator.draw_navigation_overlay(img0, nav_result, current_detections)
 
-            # Display obstacle count at the top
+            # Display obstacle count at the top-left (below the navigation status)
             if obstacle_count > 0:
-                # Main count display - Large and prominent
-                count_text = f"TOTAL OBSTACLES: {obstacle_count}"
-                cv2.putText(img0, count_text, (10, 40), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 255), 3, cv2.LINE_AA)
+                # Main count display - positioned to not overlap with navigation
+                count_text = f"OBSTACLES: {obstacle_count}"
+                cv2.rectangle(img0, (8, 145), (280, 195), (0, 0, 0), -1)
+                cv2.rectangle(img0, (8, 145), (280, 195), (0, 255, 0), 2)
+                cv2.putText(img0, count_text, (15, 175), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2, cv2.LINE_AA)
                 
                 # Breakdown by class - smaller text below
-                breakdown_y = 80
+                breakdown_y = 210
                 breakdown_parts = []
                 for class_name, count in class_counts.most_common():
                     breakdown_parts.append(f"{class_name}: {count}")
+                
+                # Split breakdown into multiple lines if too long
                 breakdown_text = " | ".join(breakdown_parts)
-                cv2.putText(img0, breakdown_text, (10, breakdown_y), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 140, 0), 2, cv2.LINE_AA)
+                if len(breakdown_text) > 50:
+                    # Split into two lines
+                    parts1 = breakdown_parts[:len(breakdown_parts)//2]
+                    parts2 = breakdown_parts[len(breakdown_parts)//2:]
+                    cv2.putText(img0, " | ".join(parts1), (10, breakdown_y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 200, 0), 2, cv2.LINE_AA)
+                    cv2.putText(img0, " | ".join(parts2), (10, breakdown_y + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 200, 0), 2, cv2.LINE_AA)
+                else:
+                    cv2.putText(img0, breakdown_text, (10, breakdown_y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 200, 0), 2, cv2.LINE_AA)
             else:
-                # No obstacles detected
-                cv2.putText(img0, "NO OBSTACLES DETECTED", (10, 40), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 3, cv2.LINE_AA)
+                # No obstacles detected - show green message
+                cv2.rectangle(img0, (8, 145), (350, 195), (0, 100, 0), -1)
+                cv2.rectangle(img0, (8, 145), (350, 195), (0, 255, 0), 2)
+                cv2.putText(img0, "NO OBSTACLES DETECTED", (15, 175), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2, cv2.LINE_AA)
 
             # FPS
             if SHOW_FPS:
