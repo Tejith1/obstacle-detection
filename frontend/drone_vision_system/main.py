@@ -1,18 +1,22 @@
 """
-main.py — Entry point for the Drone Vision System v2.
+main.py — Entry point for the Drone Vision System v3.
 
 Combines live YOLO11 camera detection (bottom half) with a 2D
 drone navigation map (top half) in a single OpenCV window.
 
+The drone navigates from a source to a destination using A* path
+planning. When obstacles are detected in the planned path, the
+route dynamically reroutes around them.
+
 Controls:
     Q        — Quit
     P        — Pause / resume
-    R        — Reset drone position
+    R        — Reset drone to source & replan
     G        — Toggle grid overlay
-    A        — Toggle auto/manual mode
     D        — Toggle debug info
     UP/DOWN  — Increase/decrease speed
-    LEFT/RIGHT — Manual steering (in manual mode)
+    Left-click on map  — Set new SOURCE
+    Right-click on map — Set new DESTINATION
 """
 
 import time
@@ -25,6 +29,7 @@ from utils import (
     COLOR_GREEN, COLOR_RED, COLOR_CYAN, COLOR_AMBER,
     COLOR_MAGENTA, COLOR_DIM_WHITE, COLOR_HUD_TEXT, COLOR_WHITE,
     COLOR_HUD_BG, COLOR_HUD_BORDER,
+    COLOR_SOURCE, COLOR_DESTINATION,
     draw_text_with_bg, draw_grid_hud, draw_scanlines,
     draw_hud_panel, draw_controls_help,
 )
@@ -32,7 +37,25 @@ from object_detection import ObjectDetector
 from drone_simulation import DroneSimulator, GridAvoidance
 
 
+# ── Mouse state ──────────────────────────────────────────────────────
+_mouse_event = None    # will be set by callback
+
+
+def _mouse_callback(event, x, y, flags, param):
+    """Handle mouse clicks on the map portion (top half)."""
+    global _mouse_event
+    if y > MAP_HEIGHT:
+        return  # clicked on camera half, ignore
+
+    if event == cv2.EVENT_LBUTTONDOWN:
+        _mouse_event = ("source", x, y)
+    elif event == cv2.EVENT_RBUTTONDOWN:
+        _mouse_event = ("dest", x, y)
+
+
 def main():
+    global _mouse_event
+
     # ── Camera ────────────────────────────────────────────────────────
     cap = cv2.VideoCapture(0)
     if not cap.isOpened():
@@ -50,18 +73,20 @@ def main():
     paused = False
     show_grid = True
     show_debug = False
-    manual_steer = 0.0
     prev_time = time.time()
     frame_count = 0
     fps_smooth = 30.0
 
-    print("[INFO] Drone Vision System v2 started. Press Q to quit.")
-    print("[INFO] Controls: Q=Quit P=Pause R=Reset G=Grid A=Auto/Manual D=Debug")
-    print("[INFO]           Arrow Keys=Steer/Speed (manual mode)")
+    print("[INFO] Drone Vision System v3 started. Press Q to quit.")
+    print("[INFO] Controls: Q=Quit P=Pause R=Reset G=Grid D=Debug")
+    print("[INFO]           Left-click=Set Source  Right-click=Set Destination")
+    print("[INFO]           Arrow Keys=Speed +/-")
 
-    # Create a resizable window
-    cv2.namedWindow("Drone Vision System v2", cv2.WINDOW_NORMAL)
-    cv2.resizeWindow("Drone Vision System v2", DISPLAY_WIDTH, DISPLAY_HEIGHT)
+    # Create window and attach mouse callback
+    win_name = "Drone Vision System v3"
+    cv2.namedWindow(win_name, cv2.WINDOW_NORMAL)
+    cv2.resizeWindow(win_name, DISPLAY_WIDTH, DISPLAY_HEIGHT)
+    cv2.setMouseCallback(win_name, _mouse_callback)
 
     # ── Main loop ─────────────────────────────────────────────────────
     while True:
@@ -93,12 +118,28 @@ def main():
         # ── Controls help (bottom-left of camera) ──
         draw_controls_help(frame, 8, PROC_HEIGHT - 200)
 
-        # ── Update drone ──
+        # ── Handle mouse events ──
+        if _mouse_event is not None:
+            action, mx, my = _mouse_event
+            # The map is displayed at DISPLAY_WIDTH × MAP_HEIGHT but the
+            # drone map coordinates are MAP_WIDTH × MAP_HEIGHT.
+            # Since MAP_WIDTH == DISPLAY_WIDTH (1024), coordinates match.
+            if action == "source":
+                drone.set_source(mx, my)
+                print(f"[INFO] Source set to ({mx}, {my})")
+            elif action == "dest":
+                drone.set_destination(mx, my)
+                print(f"[INFO] Destination set to ({mx}, {my})")
+            _mouse_event = None
+
+        # ── Update drone (pass detections for obstacle rerouting) ──
         if not paused:
-            drone.update(avoidance_steer=steer_val,
-                         manual_steer=manual_steer)
-            # Decay manual steer towards 0
-            manual_steer *= 0.85
+            drone.update(
+                avoidance_steer=steer_val,
+                detections=detections,
+                frame_w=PROC_WIDTH,
+                frame_h=PROC_HEIGHT,
+            )
 
         # ── Render map ──
         map_frame = drone.render(
@@ -123,24 +164,26 @@ def main():
         fps_smooth = fps_smooth * 0.9 + fps * 0.1
         prev_time = now
 
-        # FPS on camera (top-left)
-        fps_color = COLOR_GREEN if fps_smooth >= 20 else COLOR_AMBER if fps_smooth >= 10 else COLOR_RED
+        fps_color = (COLOR_GREEN if fps_smooth >= 20
+                     else COLOR_AMBER if fps_smooth >= 10 else COLOR_RED)
         draw_text_with_bg(cam_display, f"FPS: {fps_smooth:.0f}",
                           (10, 28), font_scale=0.50, color=fps_color,
                           border_color=fps_color)
 
-        # Mode indicator
-        mode_text = "AUTO" if drone.auto_mode else "MANUAL"
-        mode_color = COLOR_GREEN if drone.auto_mode else COLOR_MAGENTA
-        draw_text_with_bg(cam_display, mode_text,
-                          (CAM_WIDTH // 2 - 30, 28),
-                          font_scale=0.50, color=mode_color,
-                          border_color=mode_color)
+        # Navigation status indicator on camera
+        nav_color = (COLOR_GREEN if drone.nav_status == "NAVIGATING"
+                     else COLOR_RED if drone.nav_status == "NO_PATH"
+                     else COLOR_AMBER if drone.nav_status == "REROUTING"
+                     else COLOR_CYAN)
+        draw_text_with_bg(cam_display, drone.nav_status,
+                          (CAM_WIDTH // 2 - 50, 28),
+                          font_scale=0.50, color=nav_color,
+                          border_color=nav_color)
 
         # Speed indicator
         draw_text_with_bg(cam_display,
                           f"SPD: {drone.speed:.1f}",
-                          (CAM_WIDTH // 2 + 50, 28),
+                          (CAM_WIDTH // 2 + 60, 28),
                           font_scale=0.45, color=COLOR_AMBER)
 
         # Pause indicator
@@ -162,7 +205,9 @@ def main():
                 f"Drone: ({drone.x:.0f}, {drone.y:.0f})",
                 f"Heading: {drone.heading:.2f} rad",
                 f"Grid cmd: {steer_cmd}",
-                f"Steer val: {steer_val:.2f}",
+                f"Nav: {drone.nav_status}",
+                f"Path pts: {len(drone.planner.path)}",
+                f"Reroutes: {drone.planner.reroute_count}",
             ]
             for i, line in enumerate(debug_lines):
                 cv2.putText(cam_display, line,
@@ -176,7 +221,7 @@ def main():
         # ── Combine halves ──
         combined = np.vstack([map_display, cam_display])
 
-        cv2.imshow("Drone Vision System v2", combined)
+        cv2.imshow(win_name, combined)
 
         # ── Keyboard ──
         key = cv2.waitKey(1) & 0xFF
@@ -187,28 +232,18 @@ def main():
             paused = not paused
         elif key == ord("r") or key == ord("R"):
             drone.reset()
+            print("[INFO] Drone reset to source. Path replanned.")
         elif key == ord("g") or key == ord("G"):
             show_grid = not show_grid
-        elif key == ord("a") or key == ord("A"):
-            drone.toggle_auto()
-            mode = "AUTO" if drone.auto_mode else "MANUAL"
-            print(f"[INFO] Mode: {mode}")
         elif key == ord("d") or key == ord("D"):
             show_debug = not show_debug
-        # Arrow keys (special keys have high values on Windows)
-        elif key == 0:  # Special key prefix on some systems
+        # Arrow keys
+        elif key == 0:
             pass
         elif key == 82 or key == 72:  # UP arrow
             drone.change_speed(0.2)
         elif key == 84 or key == 80:  # DOWN arrow
             drone.change_speed(-0.2)
-        elif key == 81 or key == 75:  # LEFT arrow
-            if not drone.auto_mode:
-                manual_steer = -1.0
-        elif key == 83 or key == 77:  # RIGHT arrow
-            if not drone.auto_mode:
-                manual_steer = 1.0
-        # Also support +/- for speed
         elif key == ord("+") or key == ord("="):
             drone.change_speed(0.2)
         elif key == ord("-") or key == ord("_"):

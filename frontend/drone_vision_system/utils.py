@@ -83,6 +83,14 @@ COLOR_DRONE_PATH2  = (30, 100, 50)
 COLOR_WARNING      = COLOR_RED
 COLOR_WARNING_GLOW = (30, 20, 120)
 
+# Path-planning colors
+COLOR_PATH_PLANNED   = (255, 200, 0)      # bright cyan – planned route
+COLOR_PATH_REROUTED  = (30, 140, 255)     # neon orange – rerouted path
+COLOR_SOURCE         = (80, 255, 80)      # bright green – source marker
+COLOR_DESTINATION    = (255, 80, 255)     # neon magenta – destination marker
+COLOR_OBSTACLE_ZONE  = (40, 20, 180)      # semi-transparent red – blocked cells
+COLOR_PATH_ARRIVED   = (100, 255, 200)    # mint – arrival indicator
+
 # ─── Target COCO classes ─────────────────────────────────────────────
 TARGET_CLASSES = {
     "person", "car", "bicycle", "motorcycle",
@@ -98,9 +106,9 @@ GRID_LABELS = {
 }
 
 # ─── Drone simulation defaults ───────────────────────────────────────
-DRONE_SPEED = 1.2
-DRONE_SPEED_MIN = 0.3
-DRONE_SPEED_MAX = 4.0
+DRONE_SPEED = 3.0
+DRONE_SPEED_MIN = 0.5
+DRONE_SPEED_MAX = 8.0
 WORLD_SCALE = 4.0
 OBSTACLE_WARN_DIST = 80
 MANUAL_TURN_RATE = 0.06
@@ -291,11 +299,11 @@ def draw_controls_help(img, x, y):
         ("P", "Pause"),
         ("R", "Reset"),
         ("G", "Grid"),
-        ("A", "Auto/Man"),
         ("D", "Debug"),
         ("/\\", "Spd+"),
         ("\\/", "Spd-"),
-        ("<>", "Steer"),
+        ("LMB", "Set Src"),
+        ("RMB", "Set Dst"),
     ]
     draw_hud_panel(img, x, y, 120, len(controls) * 18 + 28,
                    title="CONTROLS", border_color=COLOR_CYAN)
